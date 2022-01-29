@@ -1,7 +1,14 @@
+const http = require('http');
 const cron = require('node-cron');
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js')
 require('dotenv').config();
+
+http.createServer(function(req, res) {
+	res.writeHead(200, {'Content-Type': 'text/plain'});
+	res.write('Server is running.');
+	res.end();
+}).listen(process.env.PORT || 8080)
 
 cron.schedule('0 0 * * *', function() {
 	console.log('------------------------------');
