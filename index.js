@@ -10,9 +10,25 @@ http.createServer(function(req, res) {
 	res.end();
 }).listen(process.env.PORT || 8080)
 
-cron.schedule('0 0 * * *', function() {
-	console.log('------------------------------');
+const postMessageToDiscord = async (message) => {
+	message = message || 'Hello World!';
+  
+	const discordUrl = process.env.DISCORD_NOTIFICATION_URL;
+	const payload = JSON.stringify({ content: message });
+  
+	const params = {
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		method: 'POST',
+		body: payload,
+		muteHttpExceptions: true,
+	};
+  
+	await fetch(discordUrl, params);
+}
 
+cron.schedule('0 0/6 * * *', function() {
 	const supabaseUrl = process.env.SUPABASE_HOSTNAME;
 	const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
@@ -35,6 +51,8 @@ cron.schedule('0 0 * * *', function() {
 					: arrMatches[3]
 			);
 		}
+
+		postMessageToDiscord("parseCSVData complete");
 		console.log("parseCSVData complete");
 		return arrData;
 	};
@@ -44,11 +62,16 @@ cron.schedule('0 0 * * *', function() {
 		const { data, error } = await supabase.from("us_counties").select("fips");
 
 		if (error) {
+			postMessageToDiscord(`getFips error: ${error}`);
 			console.log("getFips error:", error);
 		}
 
-		console.log("getFips complete");
-		return data;
+		if (data) {
+			postMessageToDiscord("getFips complete");
+			console.log("getFips complete");
+			return data;
+		}
+		return null;
 	};
 
 	const insertData = async (cleanData, fips) => {
@@ -75,18 +98,21 @@ cron.schedule('0 0 * * *', function() {
 			}
 		}
 
-		const { data, error, count } = await supabase
+		const { data, error } = await supabase
 			.from("us_counties_cases")
 			.upsert(insertData);
 
 		if (error) {
+			postMessageToDiscord(`inserting data error: ${error}`);
 			console.log("inserting data error:", error);
 		}
 
+		postMessageToDiscord("inserting data complete");
 		console.log(`inserting data complete`);
 	};
 
 	const getData = async () => {
+		postMessageToDiscord("beginning data update for covid.justinharkey.com");
 		console.log("getting data");
 		const response = await fetch(
 			`https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties-recent.csv`
@@ -94,7 +120,12 @@ cron.schedule('0 0 * * *', function() {
 		const covidData = await response.text();
 		const parsedData = await parseCSVData(covidData);
 		const fips = await getFips();
-		await insertData(parsedData, fips);
+		if (fips) {
+			await insertData(parsedData, fips);
+		} else {
+			postMessageToDiscord("fips failed, aborted insert");
+			console.log(`fips failed, aborted insert`);
+		}
 	};
 
 	getData();
