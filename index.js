@@ -28,7 +28,7 @@ const postMessageToDiscord = async (message) => {
 	await fetch(discordUrl, params);
 }
 
-cron.schedule('0 0/6 * * *', function() {
+cron.schedule('0 */6 * * *', function() {
 	const supabaseUrl = process.env.SUPABASE_HOSTNAME;
 	const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
