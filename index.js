@@ -105,10 +105,10 @@ cron.schedule('0 */6 * * *', function() {
 		if (error) {
 			postMessageToDiscord(`inserting data error: \n\nCode: ${error.code} \n\nDetails: ${error.details} \n\nMessage: ${error.message} \n\nHint: ${error.hint}`);
 			console.log("inserting data error:", error.details);
+		} else {
+			postMessageToDiscord("inserting data complete");
+			console.log(`inserting data complete`);
 		}
-
-		postMessageToDiscord("inserting data complete");
-		console.log(`inserting data complete`);
 	};
 
 	const getData = async () => {
