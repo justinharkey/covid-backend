@@ -52,23 +52,41 @@ cron.schedule('0 */6 * * *', function() {
 			);
 		}
 
-		postMessageToDiscord("parseCSVData complete");
-		console.log("parseCSVData complete");
+		postMessageToDiscord("✅ parseCSVData");
+		console.log("✅ parseCSVData");
 		return arrData;
 	};
+
+	const buildErrorMessage = (error) => {
+		let errorMessage = "\n\n";
+		if (error.code) {
+			errorMessage += `Code: ${error.code}\n`;
+		}
+		if (error.details) {
+			errorMessage += `Details: ${error.details}\n`;
+		}
+		if (error.message) {
+			errorMessage += `Message: ${error.message}\n`;
+		}
+		if (error.hint) {
+			errorMessage += `Hint: ${error.hint}\n`;
+		}
+		errorMessage += "\n";
+		return errorMessage;
+	}
 
 	const getFips = async () => {
 		console.log("getFips");
 		const { data, error } = await supabase.from("us_counties").select("fips");
 
 		if (error) {
-			postMessageToDiscord(`getFips error: ${error}`);
-			console.log("getFips error:", error);
+			postMessageToDiscord(`❌ getFips ${buildErrorMessage(error)}`);
+			console.log("❌ getFips", error);
 		}
 
 		if (data) {
-			postMessageToDiscord("getFips complete");
-			console.log("getFips complete");
+			postMessageToDiscord("✅ getFips");
+			console.log("✅ getFips");
 			return data;
 		}
 		return null;
@@ -103,16 +121,16 @@ cron.schedule('0 */6 * * *', function() {
 			.upsert(insertData);
 
 		if (error) {
-			postMessageToDiscord(`inserting data error: \n\nCode: ${error.code} \n\nDetails: ${error.details} \n\nMessage: ${error.message} \n\nHint: ${error.hint}`);
-			console.log("inserting data error:", error.details);
+			postMessageToDiscord(`❌ insertData ${buildErrorMessage(error)}`);
+			console.log(`❌ insertData ${buildErrorMessage(error)}`);
 		} else {
-			postMessageToDiscord("inserting data complete");
-			console.log(`inserting data complete`);
+			postMessageToDiscord("✅ insertData");
+			console.log(`✅ insertData`);
 		}
 	};
 
 	const getData = async () => {
-		postMessageToDiscord("beginning data update for covid.justinharkey.com");
+		postMessageToDiscord("beginning data upsert for covid.justinharkey.com");
 		console.log("getting data");
 		const response = await fetch(
 			`https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties-recent.csv`
@@ -123,8 +141,8 @@ cron.schedule('0 */6 * * *', function() {
 		if (fips) {
 			await insertData(parsedData, fips);
 		} else {
-			postMessageToDiscord("fips failed, aborted insert");
-			console.log(`fips failed, aborted insert`);
+			postMessageToDiscord("❌ fips failed, aborted insert");
+			console.log(`❌ fips failed, aborted insert`);
 		}
 	};
 
