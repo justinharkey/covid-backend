@@ -15,7 +15,7 @@ const fipsCache = {
 	updatedAt: null
 };
 
-const statusMessages = [];
+let statusMessages = [];
 
 const postMessageToDiscord = async (message) => {
 	message = message || 'Hello World!';
@@ -160,6 +160,7 @@ cron.schedule('0 */6 * * *', function() {
 			}
 		}
 		postMessageToDiscord(discordMessage);
+		statusMessages = [];
 	};
 
 	getData();
