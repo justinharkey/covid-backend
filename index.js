@@ -15,6 +15,8 @@ const fipsCache = {
 	updatedAt: null
 };
 
+const statusMessages = [];
+
 const postMessageToDiscord = async (message) => {
 	message = message || 'Hello World!';
   
@@ -40,7 +42,6 @@ cron.schedule('0 */6 * * *', function() {
 	const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 	const parseCSVData = (unparsedData) => {
-		console.log("parsing data");
 		let arrData = [[]];
 		// regex from https://gist.github.com/Jezternz/c8e9fafc2c114e079829974e3764db75
 		const objPattern = new RegExp(
@@ -57,46 +58,41 @@ cron.schedule('0 */6 * * *', function() {
 			);
 		}
 
-		postMessageToDiscord("✅ parseCSVData");
-		console.log("✅ parseCSVData");
+		statusMessages.push("✅ parseCSVData");
 		return arrData;
 	};
 
 	const buildErrorMessage = (error) => {
-		let errorMessage = "\n\n";
+		let errorMessage = "";
 		if (error.code) {
-			errorMessage += `Code: ${error.code}\n`;
+			errorMessage += `Code: ${error.code} | `;
 		}
 		if (error.details) {
-			errorMessage += `Details: ${error.details}\n`;
+			errorMessage += `Details: ${error.details} | `;
 		}
 		if (error.message) {
-			errorMessage += `Message: ${error.message}\n`;
+			errorMessage += `Message: ${error.message} | `;
 		}
 		if (error.hint) {
-			errorMessage += `Hint: ${error.hint}\n`;
+			errorMessage += `Hint: ${error.hint} | `;
 		}
-		errorMessage += "\n";
 		return errorMessage;
 	}
 
 	const getFips = async () => {
 		const cacheDuration = 60 * 60 * 24 * 1000; // 24 hour cache
 		if (fipsCache.data && Date.now() - fipsCache.updatedAt <= cacheDuration) {
-			console.log("Using cached fips data");
 			return fipsCache.data;
 		}
 		
 		const { data, error } = await supabase.from("us_counties").select("fips");
 
 		if (error) {
-			postMessageToDiscord(`❌ getFips ${buildErrorMessage(error)}`);
-			console.log("❌ getFips", error);
+			statusMessages.push(`❌ getFips ${buildErrorMessage(error)}`);
 		}
 
 		if (data) {
-			postMessageToDiscord("✅ getFips");
-			console.log("✅ getFips");
+			statusMessages.push("✅ getFips");
 
 			fipsCache.data = data;
     		fipsCache.updatedAt = Date.now();
@@ -108,7 +104,11 @@ cron.schedule('0 */6 * * *', function() {
 	};
 
 	const insertData = async (cleanData, fips) => {
-		console.log("inserting data");
+		if (!fips) {
+			statusMessages.push("❌ fips failed, aborted insert");
+			return null;
+		}
+
 		let insertData = [];
 
 		for (let i = 1; i < cleanData.length; i++) {
@@ -136,29 +136,30 @@ cron.schedule('0 */6 * * *', function() {
 			.upsert(insertData);
 
 		if (error) {
-			postMessageToDiscord(`❌ insertData ${buildErrorMessage(error)}`);
-			console.log(`❌ insertData ${buildErrorMessage(error)}`);
+			statusMessages.push(`❌ insertData ${buildErrorMessage(error)}`);
 		} else {
-			postMessageToDiscord("✅ insertData");
-			console.log(`✅ insertData`);
+			statusMessages.push("✅ insertData");
 		}
 	};
 
 	const getData = async () => {
-		postMessageToDiscord("beginning data upsert for covid.justinharkey.com");
-		console.log("getting data");
+		statusMessages.push("beginning data upsert for covid.justinharkey.com");
 		const response = await fetch(
 			`https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties-recent.csv`
 		);
 		const covidData = await response.text();
 		const parsedData = await parseCSVData(covidData);
 		const fips = await getFips();
-		if (fips) {
-			await insertData(parsedData, fips);
-		} else {
-			postMessageToDiscord("❌ fips failed, aborted insert");
-			console.log(`❌ fips failed, aborted insert`);
+		await insertData(parsedData, fips);
+
+		let discordMessage = '';
+		for (let i = 0; i < statusMessages.length; i++) {
+			discordMessage += statusMessages[i];
+			if (i !== statusMessages.length - 1) {
+				discordMessage += ' | ';
+			}
 		}
+		postMessageToDiscord(discordMessage);
 	};
 
 	getData();
