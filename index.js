@@ -10,6 +10,11 @@ http.createServer(function(req, res) {
 	res.end();
 }).listen(process.env.PORT || 8080)
 
+const fipsCache = {
+	data: null,
+	updatedAt: null
+};
+
 const postMessageToDiscord = async (message) => {
 	message = message || 'Hello World!';
   
@@ -76,7 +81,12 @@ cron.schedule('0 */6 * * *', function() {
 	}
 
 	const getFips = async () => {
-		console.log("getFips");
+		const cacheDuration = 60 * 60 * 24 * 1000; // 24 hour cache
+		if (fipsCache.data && Date.now() - fipsCache.updatedAt <= cacheDuration) {
+			console.log("Using cached fips data");
+			return fipsCache.data;
+		}
+		
 		const { data, error } = await supabase.from("us_counties").select("fips");
 
 		if (error) {
@@ -87,8 +97,13 @@ cron.schedule('0 */6 * * *', function() {
 		if (data) {
 			postMessageToDiscord("✅ getFips");
 			console.log("✅ getFips");
+
+			fipsCache.data = data;
+    		fipsCache.updatedAt = Date.now();
+
 			return data;
 		}
+
 		return null;
 	};
 
